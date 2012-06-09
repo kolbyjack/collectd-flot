@@ -78,47 +78,10 @@
     <!-- Placed at the end of the document so the pages load faster -->
     <script src="js/jquery-1.7.2.min.js"></script>
     <script src="js/bootstrap-2.0.4.min.js"></script>
-    <script src="js/jqplot-1.0.0b2_r1012/jquery.jqplot.min.js"></script>
-    <script src="js/jqplot-1.0.0b2_r1012/plugins/jqplot.dateAxisRenderer.js"></script>
-
-    <script>
-      $(document).ready(function() {
-        $.ajax({
-          url: "/rrd/xport.php",
-          data: {
-            host: 'orko'
-            ,plugin: 'interface'
-            //,plugin_instance: ''
-            ,type: 'if_octets'
-            ,type_instance: 'eth2'
-            ,start_time: 'month'
-            //,end_time: 'now'
-          },
-          type: 'POST',
-          dataType: "json"
-        }).done(function(data) {
-          var series = new Array();
-          var max = 0;
-
-          for (var i in data.data) {
-            series.push($.map(data.data[i].data, function(x, y) {
-              if (isNaN(x)) { x = null; }
-              else if (x > max) { max = x; }
-              return [ [ y * 1000, x ] ]
-            }));
-          }
-
-          $.jqplot($('#chartdiv'), series, {
-            axes: {
-              xaxis: { renderer: $.jqplot.DateAxisRenderer, min: data.start * 1000, max: data.end * 1000 },
-              yaxis: { min: 0 }
-            },
-            series: [ { showMarker: false }, { showMarker: false } ]
-          });
-        }).error(function(xhr, msg) { alert(msg);
-        });
-      });
-    </script>
+    <script src="js/flot/jquery.flot.js"></script>
+    <script src="js/flot/jquery.flot.time.js"></script>
+    <script src="js/flot/jquery.flot.navigate.js"></script>
+    <script src="js/rrd.js"></script>
 
   </body>
 </html>
