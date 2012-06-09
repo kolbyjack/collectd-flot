@@ -60,13 +60,17 @@ function xport($args)
     $options = array(
         '--start', $args['start_time'],
         '--end', $args['end_time'],
-        "DEF:rx={$args['rrd_path']}:rx:AVERAGE",
-        "DEF:tx={$args['rrd_path']}:tx:AVERAGE",
-        "CDEF:rxb=rx,8,*",
-        "CDEF:txb=tx,8,*",
-        "XPORT:rxb:rx bits",
-        "XPORT:txb:tx bits"
     );
+
+    $data = rrd_info($args['rrd_path']);
+    foreach ($data as $key => $val) {
+        if (0 == strncmp($key, 'ds[', 3) && 0 == substr_compare($key, '.index', -6)) {
+            $ds = split('[][]', $key);
+            $ds = $ds[1];
+            $options[] = "DEF:$ds={$args['rrd_path']}:$ds:AVERAGE";
+            $options[] = "XPORT:$ds:$ds";
+        }
+    }
 
     $data = rrd_xport($options);
     foreach ($data['data'] as &$series) {
@@ -77,8 +81,7 @@ function xport($args)
         }
     }
 
-    header('Content-Type: application/x-json');
-    echo json_encode($data);
+    return $data;
 }
 
 
@@ -97,12 +100,11 @@ function get_params($args)
                 continue;
             }
 
-            if (FALSE === ($ext = strrpos($entry, '.')) ||
-                0 != substr_compare($entry, '.rrd', $ext)) {
+            if (0 != substr_compare($entry, '.rrd', -4)) {
                 continue;
             }
 
-            $entry = substr($entry, 0, $ext);
+            $entry = substr($entry, 0, -4);
 
             $split = split('-', $entry);
             if (1 == count($split)) {
@@ -179,16 +181,18 @@ function get_params($args)
     $hosts = read_hosts(DATA_DIR);
     sort($hosts);
 
-    header('Content-Type: application/x-json');
-    echo json_encode($hosts);
+    return $hosts;
 }
 
 
-$args = parse_args($_POST);
+$args = parse_args($_GET);
 
 switch ($args['op']) {
-case 'xport': xport($args); break;
-case 'get_params': get_params($args); break;
-default: echo json_encode($args); break;
+case 'xport':       $data = xport($args); break;
+case 'get_params':  $data = get_params($args); break;
+default:            $data = $args; break;
 }
+
+header('Content-Type: application/x-json');
+echo json_encode($data);
 

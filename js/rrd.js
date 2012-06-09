@@ -1,4 +1,22 @@
-$(document).ready(fetch_data);
+$(document).ready(get_params);
+
+function populate_lists(data)
+{
+  // FIXME: Populate listboxes with returned data
+  console.log(data);
+  fetch_data();
+}
+
+function get_params()
+{
+  $.ajax({
+    url: "rrd.php",
+    data: { op: 'get_params' },
+    type: 'GET',
+    dataType: "json",
+    success: populate_lists
+  });
+}
 
 function draw_graph(data)
 {
@@ -29,19 +47,16 @@ function draw_graph(data)
 
 function fetch_data()
 {
+  var orko_if = { op: 'xport', host: 'orko', plugin: 'interface', type: 'if_octets', type_instance: 'eth2', start_time: 'week' };
+  var gir_if = { op: 'xport', host: 'gir', plugin: 'interface', type: 'if_octets', type_instance: 'eth0', start_time: 'week' };
+  var zorak_if = { op: 'xport', host: 'zorak', plugin: 'interface', type: 'if_octets', type_instance: 'eth0', start_time: 'day' };
+  var jem_load = { op: 'xport', host: 'jem', plugin: 'load', type: 'load', start_time: 'week' };
+  var penfold_load = { op: 'xport', host: 'penfold', plugin: 'load', type: 'load', start_time: 'week' };
+
   $.ajax({
     url: "rrd.php",
-    data: {
-      op: 'xport'
-      ,host: 'orko'
-      ,plugin: 'interface'
-      //,plugin_instance: ''
-      ,type: 'if_octets'
-      ,type_instance: 'eth2'
-      ,start_time: 'week'
-      //,end_time: 'now'
-    },
-    type: 'POST',
+    data: zorak_if,
+    type: 'GET',
     dataType: "json",
     success: draw_graph
   });
