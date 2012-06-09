@@ -57,8 +57,6 @@ function parse_args($query_args)
 
 function xport($args)
 {
-    header('Content-Type: application/x-json');
-
     $options = array(
         '--start', $args['start_time'],
         '--end', $args['end_time'],
@@ -79,7 +77,110 @@ function xport($args)
         }
     }
 
+    header('Content-Type: application/x-json');
     echo json_encode($data);
+}
+
+
+function get_params($args)
+{
+    function read_rrdfiles($dirname)
+    {
+        if (!($dp = opendir($dirname))) {
+            return null;
+        }
+
+        $rrd_files= array();
+
+        while (($entry = readdir($dp)) !== false) {
+            if ($entry == '.' || $entry == '..') {
+                continue;
+            }
+
+            if (FALSE === ($ext = strrpos($entry, '.')) ||
+                0 != substr_compare($entry, '.rrd', $ext)) {
+                continue;
+            }
+
+            $entry = substr($entry, 0, $ext);
+
+            $split = split('-', $entry);
+            if (1 == count($split)) {
+                $split[1] = '';
+            }
+
+            if (!isset($rrd_files[$split[0]])) {
+                $rrd_files[$split[0]] = array();
+            }
+
+            $rrd_files[$split[0]][] = $split[1];
+        }
+
+        closedir($dp);
+
+        return $rrd_files;
+    }
+
+    function read_plugins($dirname)
+    {
+        if (!($dp = opendir($dirname))) {
+            return null;
+        }
+
+        $plugins = array();
+
+        while (($entry = readdir($dp)) !== false) {
+            if ($entry == '.' || $entry == '..') {
+                continue;
+            }
+
+            if (($rrd_files = read_rrdfiles("$dirname/$entry"))) {
+                $split = split('-', $entry);
+                if (1 == count($split)) {
+                    $split[1] = '';
+                }
+
+                if (!isset($plugins[$split[0]])) {
+                    $plugins[$split[0]] = array();
+                }
+
+                $plugins[$split[0]][$split[1]] = $rrd_files;
+            }
+        }
+
+        closedir($dp);
+
+        return $plugins;
+    }
+
+    function read_hosts($dirname)
+    {
+        if (!($dp = opendir($dirname))) {
+            return null;
+        }
+
+        $hosts = array();
+
+        while (($entry = readdir($dp)) !== false) {
+            if ($entry == '.' || $entry == '..') {
+                continue;
+            }
+
+            if (($plugins = read_plugins("$dirname/$entry"))) {
+                $hosts[$entry] = $plugins;
+            }
+        }
+
+        closedir($dp);
+
+        return $hosts;
+    }
+
+    $hosts = read_hosts(DATA_DIR);
+    sort($hosts);
+
+    header('Content-Type: application/x-json');
+    echo json_encode($hosts);
 }
 
 
@@ -87,6 +188,7 @@ $args = parse_args($_POST);
 
 switch ($args['op']) {
 case 'xport': xport($args); break;
+case 'get_params': get_params($args); break;
 default: echo json_encode($args); break;
 }
 
