@@ -29,15 +29,11 @@ function parse_args($query_args)
     $args['op'] = $query_args['op'];
     $args['host'] = abspath($query_args['host']);
     $args['plugin'] = abspath($query_args['plugin']);
-    $args['plugin_instance'] = $pinstance = abspath($query_args['plugin_instance']);
+    $args['plugin_instance'] = abspath($query_args['plugin_instance']);
     $args['type'] = abspath($query_args['type']);
-    $args['type_instance'] = $tinstance = abspath($query_args['type_instance']);
+    $args['type_instance'] = abspath($query_args['type_instance']);
     $args['start_time'] = $query_args['start_time'];
     $args['end_time'] = $query_args['end_time'];
-
-    $args['rrd_path'] = sprintf("%s/%s/%s%s/%s%s.rrd", DATA_DIR, $args['host'],
-        $args['plugin'], (strlen($pinstance) > 0) ? "-$pinstance" : '',
-        $args['type'], (strlen($tinstance) > 0) ? "-$tinstance" : '');
 
     if (0 == strlen($args['end_time'])) {
         $args['end_time'] = 'now';
@@ -57,36 +53,111 @@ function parse_args($query_args)
 
 function xport($args)
 {
+    function get_rrd_path($args)
+    {
+        $pi = $args['plugin_instance'];
+        $ti = $args['type_instance'];
+
+        return sprintf("%s/%s/%s%s/%s%s.rrd", DATA_DIR, $args['host'],
+            $args['plugin'], (strlen($pi) > 0) ? "-$pi" : '',
+            $args['type'], (strlen($ti) > 0) ? "-$ti" : '');
+    }
+
+    function add_split_rrd(&$options, $components, $args)
+    {
+        foreach ($components as $instance => $label) {
+            $args['type_instance'] = $instance;
+            $rrd_path = get_rrd_path($args);
+            array_push($options,
+                "DEF:$instance=$rrd_path:value:AVERAGE",
+                "XPORT:$instance:$label");
+        }
+    }
+
     $options = array(
         '--start', $args['start_time'],
-        '--end', $args['end_time'],
-    );
+        '--end', $args['end_time']);
+
+    $settings = array();
 
     switch ($args['plugin']) {
 
+    case 'cpu':
+        $args['type'] = $args['plugin'];
+        $args['type_instance'] = null;
+        $components = array('steal' => 'steal', 'interrupt' => 'interrupt',
+            'softirq' => 'softirq', 'system' => 'system', 'user' => 'user',
+            'nice' => 'nice', 'wait' => 'wait', 'idle' => 'idle');
+        $settings['stack'] = true;
+
+        add_split_rrd($options, $components, $args);
+        break;
+
     case 'interface':
-        $options[] = "DEF:rx={$args['rrd_path']}:rx:AVERAGE";
-        $options[] = "DEF:tx={$args['rrd_path']}:tx:AVERAGE";
-        $options[] = "CDEF:incoming=rx,8,*";
-        $options[] = "CDEF:outgoing=tx,8,*";
-        $options[] = "XPORT:incoming:Incoming (bits/s)";
-        $options[] = "XPORT:outgoing:Outgoing (bits/s)";
+        $args['plugin_instance'] = null;
+        $rrd_path = get_rrd_path($args);
+        array_push($options,
+            "DEF:rx=$rrd_path:rx:AVERAGE",
+            "DEF:tx=$rrd_path:tx:AVERAGE",
+            "CDEF:incoming=rx,8,*",
+            "CDEF:outgoing=tx,8,*",
+            "XPORT:incoming:Incoming (bits/s)",
+            "XPORT:outgoing:Outgoing (bits/s)");
+        break;
+
+    case 'load':
+        $args['plugin_instance'] = null;
+        $args['type'] = $args['plugin'];
+        $args['type_instance'] = null;
+        $rrd_path = get_rrd_path($args);
+        array_push($options,
+            "DEF:shortterm=$rrd_path:shortterm:AVERAGE",
+            "DEF:midterm=$rrd_path:midterm:AVERAGE",
+            "DEF:longterm=$rrd_path:longterm:AVERAGE",
+            "XPORT:shortterm:1 min",
+            "XPORT:midterm:5 min",
+            "XPORT:longterm:15 min");
+        break;
+
+    case 'memory':
+        $args['plugin_instance'] = null;
+        $args['type'] = $args['plugin'];
+        $components = array('used' => 'used', 'buffered' => 'buffered',
+            'cached' => 'cached', 'free' => 'free');
+        $settings['stack'] = true;
+        $settings['metricBase'] = 'binary';
+
+        add_split_rrd($options, $components, $args);
+        break;
+
+    case 'swap':
+        $args['plugin_instance'] = null;
+        $args['type'] = $args['plugin'];
+        $components = array('used' => 'used',
+            'cached' => 'cached', 'free' => 'free');
+        $settings['stack'] = true;
+        $settings['metricBase'] = 'binary';
+
+        add_split_rrd($options, $components, $args);
         break;
 
     default:
-        $data = rrd_info($args['rrd_path']);
-        foreach ($data as $key => $val) {
+        $rrd_path = get_rrd_path($args);
+        $info = rrd_info($rrd_path);
+        foreach ($info as $key => $val) {
             if (0 == strncmp($key, 'ds[', 3) && 0 == substr_compare($key, '.index', -6)) {
                 $ds = split('[][]', $key);
                 $ds = $ds[1];
-                $options[] = "DEF:$ds={$args['rrd_path']}:$ds:AVERAGE";
-                $options[] = "XPORT:$ds:$ds";
+                array_push($options,
+                    "DEF:$ds=$rrd_path:$ds:AVERAGE",
+                    "XPORT:$ds:$ds");
             }
         }
         break;
     }
 
     $data = rrd_xport($options);
+    $data['settings'] = $settings;
     foreach ($data['data'] as &$series) {
         foreach ($series['data'] as $time => &$value) {
             if (is_nan($value)) {

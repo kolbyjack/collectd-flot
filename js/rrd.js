@@ -20,7 +20,8 @@ function get_params()
 
 function metricTicks(tick, axis) {
 
-  var metricUnits = [
+  var decimalUnits = [
+    [ 'm', 0.001 ],
     [ '',  1 ],
     [ 'K', 1000 ],
     [ 'M', 1000 * 1000 ],
@@ -29,14 +30,39 @@ function metricTicks(tick, axis) {
     [ 'P', 1000 * 1000 * 1000 * 1000 * 1000 ]
   ];
 
+  var binaryUnits = [
+    [ 'm', 1.0 / 1024.0 ],
+    [ '',  1 ],
+    [ 'Ki', 1024 ],
+    [ 'Mi', 1024 * 1024 ],
+    [ 'Gi', 1024 * 1024 * 1024 ],
+    [ 'Ti', 1024 * 1024 * 1024 * 1024 ],
+    [ 'Pi', 1024 * 1024 * 1024 * 1024 * 1024 ]
+  ];
+
+  var base = decimalUnits;
   var units = 0;
 
-  while (axis.max >= metricUnits[units][1] * 990 && units + 1 < metricUnits.length) {
+  if ('binary' == axis.options.metricBase) {
+    base = binaryUnits;
+  }
+
+  while (axis.max >= base[units][1] * 990 && units + 1 < base.length) {
     ++units;
   }
 
-  var scale = 10 / metricUnits[units][1];
-  return ((tick * scale) << 0) * 0.1 + ' ' + metricUnits[units][0] + ' ';
+  var scale = 10 / base[units][1];
+  var value = (tick * scale + 0.5) << 0;
+  var tenth = value % 10;
+
+  value = (value * 0.1) << 0;
+  if (tenth > 0) {
+    tenth = '.' + tenth;
+  } else {
+    tenth = '';
+  }
+
+  return value + tenth + ' ' + base[units][0] + ' ';
 }
 
 function draw_graph(data)
@@ -57,7 +83,8 @@ function draw_graph(data)
   $.plot($('#chartdiv'), series, {
     series: {
       points: { show: false },
-      lines: { show: true, fill: true }
+      lines: { show: true, fill: true },
+      stack: data.settings.stack
     },
     xaxis: {
       mode: 'time',
@@ -66,9 +93,11 @@ function draw_graph(data)
     },
     yaxis: {
       tickFormatter: metricTicks,
+      metricBase: data.settings.metricBase,
       min: 0,
       panRange: [ 0, max * 2 ]
-    }//,
+    },
+    legend: { position: 'nw' }//,
     //zoom: { interactive: true },
     //pan: { interactive: true }
   });
@@ -76,15 +105,16 @@ function draw_graph(data)
 
 function fetch_data()
 {
-  var orko_if = { op: 'xport', host: 'orko', plugin: 'interface', type: 'if_octets', type_instance: 'eth2', start_time: 'week' };
-  var gir_if = { op: 'xport', host: 'gir', plugin: 'interface', type: 'if_octets', type_instance: 'eth0', start_time: 'week' };
-  var zorak_if = { op: 'xport', host: 'zorak', plugin: 'interface', type: 'if_octets', type_instance: 'eth0', start_time: 'day' };
-  var jem_load = { op: 'xport', host: 'jem', plugin: 'load', type: 'load', start_time: 'week' };
-  var penfold_load = { op: 'xport', host: 'penfold', plugin: 'load', type: 'load', start_time: 'week' };
+  var zorak_if = { op: 'xport', host: 'zorak', plugin: 'interface', type: 'if_octets', type_instance: 'eth0', start_time: 'week' };
+  var zorak_load = { op: 'xport', host: 'zorak', plugin: 'load', start_time: 'week' };
+  var zorak_memory = { op: 'xport', host: 'zorak', plugin: 'memory', start_time: 'week' };
+  var zorak_swap = { op: 'xport', host: 'zorak', plugin: 'swap', start_time: 'week' };
+  var zorak_cpu0 = { op: 'xport', host: 'zorak', plugin: 'cpu', plugin_instance: 0, start_time: 'week' };
+  var data = zorak_cpu0;
 
   $.ajax({
     url: "rrd.php",
-    data: zorak_if,
+    data: data,
     type: 'GET',
     dataType: "json",
     success: draw_graph
