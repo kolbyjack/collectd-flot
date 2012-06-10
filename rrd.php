@@ -62,14 +62,28 @@ function xport($args)
         '--end', $args['end_time'],
     );
 
-    $data = rrd_info($args['rrd_path']);
-    foreach ($data as $key => $val) {
-        if (0 == strncmp($key, 'ds[', 3) && 0 == substr_compare($key, '.index', -6)) {
-            $ds = split('[][]', $key);
-            $ds = $ds[1];
-            $options[] = "DEF:$ds={$args['rrd_path']}:$ds:AVERAGE";
-            $options[] = "XPORT:$ds:$ds";
+    switch ($args['plugin']) {
+
+    case 'interface':
+        $options[] = "DEF:rx={$args['rrd_path']}:rx:AVERAGE";
+        $options[] = "DEF:tx={$args['rrd_path']}:tx:AVERAGE";
+        $options[] = "CDEF:incoming=rx,8,*";
+        $options[] = "CDEF:outgoing=tx,8,*";
+        $options[] = "XPORT:incoming:Incoming (bits/s)";
+        $options[] = "XPORT:outgoing:Outgoing (bits/s)";
+        break;
+
+    default:
+        $data = rrd_info($args['rrd_path']);
+        foreach ($data as $key => $val) {
+            if (0 == strncmp($key, 'ds[', 3) && 0 == substr_compare($key, '.index', -6)) {
+                $ds = split('[][]', $key);
+                $ds = $ds[1];
+                $options[] = "DEF:$ds={$args['rrd_path']}:$ds:AVERAGE";
+                $options[] = "XPORT:$ds:$ds";
+            }
         }
+        break;
     }
 
     $data = rrd_xport($options);

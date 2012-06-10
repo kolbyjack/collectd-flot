@@ -18,6 +18,27 @@ function get_params()
   });
 }
 
+function metricTicks(tick, axis) {
+
+  var metricUnits = [
+    [ '',  1 ],
+    [ 'K', 1000 ],
+    [ 'M', 1000 * 1000 ],
+    [ 'G', 1000 * 1000 * 1000 ],
+    [ 'T', 1000 * 1000 * 1000 * 1000 ],
+    [ 'P', 1000 * 1000 * 1000 * 1000 * 1000 ]
+  ];
+
+  var units = 0;
+
+  while (axis.max >= metricUnits[units][1] * 990 && units + 1 < metricUnits.length) {
+    ++units;
+  }
+
+  var scale = 10 / metricUnits[units][1];
+  return ((tick * scale) << 0) * 0.1 + ' ' + metricUnits[units][0] + ' ';
+}
+
 function draw_graph(data)
 {
   var series = new Array();
@@ -38,10 +59,18 @@ function draw_graph(data)
       points: { show: false },
       lines: { show: true, fill: true }
     },
-    xaxis: { mode: 'time', panRange: [ data.start * 1000, data.end * 1000 ] },
-    yaxis: { min: 0, panRange: [ 0, max * 2 ] },
-    zoom: { interactive: true },
-    pan: { interactive: true }
+    xaxis: {
+      mode: 'time',
+      timezone: 'browser',
+      panRange: [ data.start * 1000, data.end * 1000 ]
+    },
+    yaxis: {
+      tickFormatter: metricTicks,
+      min: 0,
+      panRange: [ 0, max * 2 ]
+    }//,
+    //zoom: { interactive: true },
+    //pan: { interactive: true }
   });
 }
 
