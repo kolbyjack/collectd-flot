@@ -28,10 +28,24 @@ function parse_args($query_args)
 {
     $args['op'] = $query_args['op'];
     $args['host'] = abspath($query_args['host']);
-    $args['plugin'] = abspath($query_args['plugin']);
-    $args['plugin_instance'] = abspath($query_args['plugin_instance']);
-    $args['type'] = abspath($query_args['type']);
-    $args['type_instance'] = abspath($query_args['type_instance']);
+
+    if (isset($query_args['chart'])) {
+        $split = split('/', abspath($query_args['chart']));
+
+        $plugin_parts = split('-', $split[0], 2);
+        $type_parts = split('-', $split[1], 2);
+
+        $args['plugin'] = $plugin_parts[0];
+        $args['plugin_instance'] = $plugin_parts[1];
+        $args['type'] = $type_parts[0];
+        $args['type_instance'] = $type_parts[1];
+    } else {
+        $args['plugin'] = abspath($query_args['plugin']);
+        $args['plugin_instance'] = abspath($query_args['plugin_instance']);
+        $args['type'] = abspath($query_args['type']);
+        $args['type_instance'] = abspath($query_args['type_instance']);
+    }
+
     $args['start_time'] = $query_args['start_time'];
     $args['end_time'] = $query_args['end_time'];
 
