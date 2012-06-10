@@ -95,6 +95,7 @@ function draw_graph(data)
       tickFormatter: metricTicks,
       metricBase: data.settings.metricBase,
       min: 0,
+      max: data.settings.max,
       panRange: [ 0, max * 2 ]
     },
     legend: { position: 'nw' }//,
@@ -110,7 +111,10 @@ function fetch_data()
   var zorak_memory = { op: 'xport', host: 'zorak', plugin: 'memory', start_time: 'week' };
   var zorak_swap = { op: 'xport', host: 'zorak', plugin: 'swap', start_time: 'week' };
   var zorak_cpu0 = { op: 'xport', host: 'zorak', plugin: 'cpu', plugin_instance: 0, start_time: 'week' };
-  var data = zorak_cpu0;
+  var zorak_df_boot = { op: 'xport', host: 'zorak', plugin: 'df', type_instance: 'boot', start_time: 'week' };
+  var zorak_df_root = { op: 'xport', host: 'zorak', plugin: 'df', type_instance: 'root', start_time: 'week' };
+  var zorak_disk = { op: 'xport', host: 'zorak', plugin: 'disk', plugin_instance: 'sda3', type: 'disk_octets', start_time: 'week' };
+  var data = zorak_disk;
 
   $.ajax({
     url: "rrd.php",

@@ -89,6 +89,7 @@ function xport($args)
             'softirq' => 'softirq', 'system' => 'system', 'user' => 'user',
             'nice' => 'nice', 'wait' => 'wait', 'idle' => 'idle');
         $settings['stack'] = true;
+        $settings['max'] = 100;
 
         add_split_rrd($options, $components, $args);
         break;
@@ -141,6 +142,29 @@ function xport($args)
         add_split_rrd($options, $components, $args);
         break;
 
+    case 'df':
+        $args['plugin_instance'] = null;
+        $args['type'] = $args['plugin'];
+        $rrd_path = get_rrd_path($args);
+        array_push($options,
+            "DEF:used=$rrd_path:used:AVERAGE",
+            "DEF:free=$rrd_path:free:AVERAGE",
+            "XPORT:used:used",
+            "XPORT:free:free");
+
+        $settings['stack'] = true;
+        break;
+
+    case 'disk':
+        $args['type_instance'] = null;
+        $rrd_path = get_rrd_path($args);
+        array_push($options,
+            "DEF:write=$rrd_path:write:AVERAGE",
+            "DEF:read=$rrd_path:read:AVERAGE",
+            "XPORT:write:Written",
+            "XPORT:read:Read");
+        break;
+
     default:
         $rrd_path = get_rrd_path($args);
         $info = rrd_info($rrd_path);
@@ -189,18 +213,7 @@ function get_params($args)
                 continue;
             }
 
-            $entry = substr($entry, 0, -4);
-
-            $split = split('-', $entry);
-            if (1 == count($split)) {
-                $split[1] = '';
-            }
-
-            if (!isset($rrd_files[$split[0]])) {
-                $rrd_files[$split[0]] = array();
-            }
-
-            $rrd_files[$split[0]][] = $split[1];
+            $rrd_files[] = substr($entry, 0, -4);
         }
 
         closedir($dp);
@@ -217,26 +230,24 @@ function get_params($args)
         $plugins = array();
 
         while (($entry = readdir($dp)) !== false) {
-            if ($entry == '.' || $entry == '..') {
+            if ($entry === '.' || $entry === '..') {
                 continue;
             }
 
-            if (($rrd_files = read_rrdfiles("$dirname/$entry"))) {
-                $split = split('-', $entry);
-                if (1 == count($split)) {
-                    $split[1] = '';
+            if (0 === strncmp($entry, 'cpu-', 4) || 'load' === $entry ||
+                'memory' === $entry || 'swap' === $entry) {
+                $plugins[] = $entry;
+            } elseif (($rrd_files = read_rrdfiles("$dirname/$entry"))) {
+                $host = basename($dirname);
+                foreach ($rrd_files as $rrd) {
+                    $plugins[] = "$entry/$rrd";
                 }
-
-                if (!isset($plugins[$split[0]])) {
-                    $plugins[$split[0]] = array();
-                }
-
-                $plugins[$split[0]][$split[1]] = $rrd_files;
             }
         }
 
         closedir($dp);
 
+        sort($plugins);
         return $plugins;
     }
 
@@ -264,7 +275,7 @@ function get_params($args)
     }
 
     $hosts = read_hosts(DATA_DIR);
-    sort($hosts);
+    ksort($hosts);
 
     return $hosts;
 }
