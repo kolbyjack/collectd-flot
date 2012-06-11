@@ -1,9 +1,9 @@
 ## TODO Items
 * Hash-based urls ([Hasher](https://github.com/millermedeiros/Hasher)?)
-** Makes it possible to bookmark sets of charts
+    * Makes it possible to bookmark sets of charts
 * External legend of appropriate width
 * Custom colors for charts
-** php-collectd has a nice set of colors
+    * php-collectd has a nice set of colors
 * Customize output for all plugings
 * Let the user choose the timeframe
 ** Start *and* end date/time
