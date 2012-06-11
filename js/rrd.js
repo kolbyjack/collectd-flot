@@ -130,7 +130,7 @@ function updateChartList()
 function getParams()
 {
   $.ajax({
-    url: "rrd.php",
+    url: "data.php",
     data: { op: 'get_params' },
     type: 'GET',
     dataType: "json",
@@ -207,7 +207,7 @@ function fetchData()
   };
 
   $.ajax({
-    url: "rrd.php",
+    url: "data.php",
     data: data,
     type: 'GET',
     dataType: "json",
