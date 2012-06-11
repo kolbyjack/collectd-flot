@@ -12,4 +12,5 @@
 * [Chosen](https://github.com/harvesthq/chosen) for chart host/chart select?
 * Disable highlight of nearest datapoint or make legend text match it
 * Detect null values and don't display 0 for them in the legend
+* Fix graph stacking order to match legend display
 
