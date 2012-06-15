@@ -77,10 +77,12 @@ function xport($args)
             $args['type'], (strlen($ti) > 0) ? "-$ti" : '');
     }
 
-    function add_split_rrd(&$options, $components, $args)
+    function add_split_rrd(&$options, $components, $args, $plugin_instance, $type)
     {
+        $args['plugin_instance'] = $plugin_instance;
+        $args['type'] = $type;
         foreach ($components as $instance => $label) {
-            $args['type_instance'] = $instance;
+            $args['type_instance'] = is_numeric($instance) ? $label : $instance;
             $rrd_path = get_rrd_path($args);
             array_push($options,
                 "DEF:$instance=$rrd_path:value:AVERAGE",
@@ -97,18 +99,40 @@ function xport($args)
     switch ($args['plugin']) {
 
     case 'cpu':
-        $args['type'] = $args['plugin'];
-        $args['type_instance'] = null;
-        $components = array('steal' => 'steal', 'interrupt' => 'interrupt',
-            'softirq' => 'softirq', 'system' => 'system', 'user' => 'user',
-            'nice' => 'nice', 'wait' => 'wait', 'idle' => 'idle');
+        $components = array('steal', 'interrupt', 'softirq',
+            'system', 'user', 'nice', 'wait', 'idle');
+        add_split_rrd($options, $components, $args, $args['plugin_instance'], 'cpu');
+
         $settings['stack'] = true;
         $settings['max'] = 100;
+        break;
 
-        add_split_rrd($options, $components, $args);
+    case 'df':
+        $args['plugin_instance'] = null;
+        $args['type'] = 'df';
+        $rrd_path = get_rrd_path($args);
+        array_push($options,
+            "DEF:used=$rrd_path:used:AVERAGE",
+            "DEF:free=$rrd_path:free:AVERAGE",
+            "XPORT:used:used",
+            "XPORT:free:free");
+
+        $settings['stack'] = true;
+        $settings['colors'] = array('red', 'green');
+        break;
+
+    case 'disk':
+        $args['type_instance'] = null;
+        $rrd_path = get_rrd_path($args);
+        array_push($options,
+            "DEF:write=$rrd_path:write:AVERAGE",
+            "DEF:read=$rrd_path:read:AVERAGE",
+            "XPORT:write:Written",
+            "XPORT:read:Read");
         break;
 
     case 'interface':
+        $units = ('if_octets' === $args['type']) ? 'bits/s' : '/s';
         $args['plugin_instance'] = null;
         $rrd_path = get_rrd_path($args);
         array_push($options,
@@ -116,14 +140,13 @@ function xport($args)
             "DEF:tx=$rrd_path:tx:AVERAGE",
             "CDEF:incoming=rx,8,*",
             "CDEF:outgoing=tx,8,*",
-            "XPORT:incoming:Incoming (bits/s)",
-            "XPORT:outgoing:Outgoing (bits/s)");
+            "XPORT:incoming:Incoming ($units)",
+            "XPORT:outgoing:Outgoing ($units)");
         break;
 
     case 'load':
-        $args['plugin_instance'] = null;
-        $args['type'] = $args['plugin'];
-        $args['type_instance'] = null;
+        $args['plugin_instance'] = $args['type_instance'] = null;
+        $args['type'] = 'load';
         $rrd_path = get_rrd_path($args);
         array_push($options,
             "DEF:shortterm=$rrd_path:shortterm:AVERAGE",
@@ -135,48 +158,45 @@ function xport($args)
         break;
 
     case 'memory':
-        $args['plugin_instance'] = null;
-        $args['type'] = $args['plugin'];
-        $components = array('used' => 'used', 'buffered' => 'buffered',
-            'cached' => 'cached', 'free' => 'free');
+        $components = array('used', 'buffered', 'cached', 'free');
+        add_split_rrd($options, $components, $args, null, 'memory');
+
         $settings['stack'] = true;
         $settings['metricBase'] = 'binary';
-
-        add_split_rrd($options, $components, $args);
         break;
 
-    case 'swap':
-        $args['plugin_instance'] = null;
-        $args['type'] = $args['plugin'];
-        $components = array('used' => 'used',
-            'cached' => 'cached', 'free' => 'free');
-        $settings['stack'] = true;
-        $settings['metricBase'] = 'binary';
+    case 'nginx':
+        $components = array('active', 'reading', 'writing', 'waiting');
+        add_split_rrd($options, $components, $args, null, 'nginx_connections');
 
-        add_split_rrd($options, $components, $args);
-        break;
-
-    case 'df':
-        $args['plugin_instance'] = null;
-        $args['type'] = $args['plugin'];
-        $rrd_path = get_rrd_path($args);
-        array_push($options,
-            "DEF:used=$rrd_path:used:AVERAGE",
-            "DEF:free=$rrd_path:free:AVERAGE",
-            "XPORT:used:used",
-            "XPORT:free:free");
-
-        $settings['stack'] = true;
-        break;
-
-    case 'disk':
+        $args['type'] = 'nginx_requests';
         $args['type_instance'] = null;
         $rrd_path = get_rrd_path($args);
         array_push($options,
-            "DEF:write=$rrd_path:write:AVERAGE",
-            "DEF:read=$rrd_path:read:AVERAGE",
-            "XPORT:write:Written",
-            "XPORT:read:Read");
+            "DEF:value=$rrd_path:value:AVERAGE",
+            "XPORT:value:requests");
+        break;
+
+    case 'processes':
+        $components = array('blocked', 'paging', 'running', 'sleeping', 'stopped', 'zombies');
+        add_split_rrd($options, $components, $args, null, 'ps_state');
+
+        $args['type'] = 'fork_rate';
+        $args['type_instance'] = null;
+        $rrd_path = get_rrd_path($args);
+        array_push($options,
+            "DEF:value=$rrd_path:value:AVERAGE",
+            "XPORT:value:fork rate");
+
+        $settings['stack'] = true;
+        break;
+
+    case 'swap':
+        $components = array('used', 'cached', 'free');
+        add_split_rrd($options, $components, $args, null, 'swap');
+
+        $settings['stack'] = true;
+        $settings['metricBase'] = 'binary';
         break;
 
     default:
@@ -248,8 +268,8 @@ function get_params($args)
                 continue;
             }
 
-            if (0 === strncmp($entry, 'cpu-', 4) || 'load' === $entry ||
-                'memory' === $entry || 'swap' === $entry) {
+            $custom_charts = array('load', 'memory', 'swap', 'nginx', 'processes');
+            if (0 === strncmp($entry, 'cpu-', 4) || in_array($entry, $custom_charts)) {
                 $plugins[] = $entry;
             } elseif (($rrd_files = read_rrdfiles("$dirname/$entry"))) {
                 $host = basename($dirname);
