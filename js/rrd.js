@@ -51,6 +51,12 @@ function prettyPrint(value, baseType)
   return value + ' ' + base[units][0] + ' ';
 }
 
+function zeroPad(n)
+{
+  if (n > 9) return n;
+  return '0' + n;
+}
+
 function updateLegend(event, pos, item)
 {
   updateLegendTimeout = null;
@@ -62,6 +68,12 @@ function updateLegend(event, pos, item)
     pos.y < axes.yaxis.min || pos.y > axes.yaxis.max) {
     return;
   }
+
+  var months = [ 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec' ];
+  var d = new Date(pos.x);
+  // FIXME: Change the precision based on the range
+  $('#hovertime').text(months[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear() + ' ' +
+                       d.getHours() + ':' + zeroPad(d.getMinutes()));
 
   var i, j, dataset = plot.getData();
   for (i = 0; i < dataset.length; ++i) {
@@ -95,7 +107,7 @@ function updateLegend(event, pos, item)
     else
       y = p1[1] + (p2[1] - p1[1]) * (pos.x - p1[0]) / (p2[0] - p1[0]);
 
-    legends.eq(i).text(series.label + ': ' + prettyPrint(y));
+    $('#legend-' + series.label + '-label').text(series.label + ': ' + prettyPrint(y));
   }
 }
 
@@ -111,6 +123,16 @@ function populateHosts(data)
   });
 }
 
+function clearGraph()
+{
+  $.plot($('#chartdiv'), [[]], {
+      xaxis: { tickFormatter: function() { return ' '; } },
+      yaxis: { tickFormatter: function() { return ' '; } }
+    }
+  );
+  $('#legend').html('&nbsp;');
+}
+
 function updateChartList()
 {
   var hosts = $("#rrd_hosts");
@@ -119,6 +141,7 @@ function updateChartList()
     return;
   }
 
+  clearGraph();
   var charts = $("#host_charts");
   charts.find('option').remove();
   charts.append($("<option />").val('').text('Choose chart'));
@@ -129,6 +152,7 @@ function updateChartList()
 
 function getParams()
 {
+  clearGraph();
   $.ajax({
     url: "data.php",
     data: { op: 'get_params' },
@@ -161,7 +185,7 @@ function drawGraph(data)
   plot = $.plot($('#chartdiv'), series, {
     series: {
       points: { show: false },
-      lines: { show: true, fill: true },
+      lines: { show: true, fill: data.settings.stack },
       stack: data.settings.stack
     },
     xaxis: {
@@ -176,17 +200,44 @@ function drawGraph(data)
       max: data.settings.max,
       panRange: [ 0, max * 2 ]
     },
-    grid: { hoverable: true },
-    legend: { position: 'nw' }//,
-    //zoom: { interactive: true },
-    //pan: { interactive: true }
+    grid: {
+      hoverable: true,
+      autoHighlight: false
+    },
+    legend: { show: false },
+    colors: data.settings.colors,
+    zoom: { interactive: true }
   });
 
-  legends = $("#chartdiv .legendLabel");
-  legends.each(function () {
-    // fix the widths so they don't jump around
-    $(this).css('width', $(this).width());
-  });
+  var legend = $('#legend');
+  legend.html('');
+
+  var lines = plot.getData();
+  for (var i in lines) {
+    var line = lines[i];
+
+    var container = $('<div/>', { id: 'legend-' + line.label }).
+      css('display', 'inline-block').
+      css('width', '10em').
+      css('height', '4ex');
+
+    var color = $('<div/>', { id: 'legend-' + line.label + '-color' }).
+      css('display', 'inline-block').
+      css('width', '12px').
+      css('height', '8px').
+      css('background-color', line.color);
+
+    var label = $('<div/>', { id: 'legend-' + line.label + '-label' }).
+      text(line.label).
+      css('display', 'inline-block').
+      css('padding-left', '5px');
+
+    container.append(color);
+    container.append(label);
+    legend.append(container);
+  }
+        
+  $('#hovertime').html('&nbsp;');
 }
 
 function fetchData()
