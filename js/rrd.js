@@ -107,7 +107,7 @@ function updateLegend(event, pos, item)
     else
       y = p1[1] + (p2[1] - p1[1]) * (pos.x - p1[0]) / (p2[0] - p1[0]);
 
-    $('#legend-' + series.label + '-label').text(series.label + ': ' + prettyPrint(y));
+    $('#legend-' + i + '-label').text(series.label + ': ' + prettyPrint(y));
   }
 }
 
@@ -175,9 +175,9 @@ function drawGraph(data)
   for (var i in data.data) {
     series.push({
       label: data.data[i].legend,
-      data: $.map(data.data[i].data, function(x, y) {
-        if (x > max) { max = x; }
-        return [ [ y * 1000, x ] ];
+      data: $.map(data.data[i].data, function(y, x) {
+        if (y > max) { max = y; }
+        return [ [ x * 1000, y ] ];
       })
     });
   }
@@ -206,6 +206,7 @@ function drawGraph(data)
     },
     legend: { show: false },
     colors: data.settings.colors,
+    pan: { interactive: true },
     zoom: { interactive: true }
   });
 
@@ -213,21 +214,31 @@ function drawGraph(data)
   legend.html('');
 
   var lines = plot.getData();
+
+  var width = 8;
+  for (var i in lines) {
+    var line = lines[i];
+    if (line.label.length > width) {
+      width = line.label.length;
+    }
+  }
+  width = (width >> 1) + 6;
+
   for (var i in lines) {
     var line = lines[i];
 
-    var container = $('<div/>', { id: 'legend-' + line.label }).
+    var container = $('<div/>', { id: 'legend-' + i }).
       css('display', 'inline-block').
-      css('width', '10em').
+      css('width', width + 'em').
       css('height', '4ex');
 
-    var color = $('<div/>', { id: 'legend-' + line.label + '-color' }).
+    var color = $('<div/>', { id: 'legend-' + i + '-color' }).
       css('display', 'inline-block').
       css('width', '12px').
       css('height', '8px').
       css('background-color', line.color);
 
-    var label = $('<div/>', { id: 'legend-' + line.label + '-label' }).
+    var label = $('<div/>', { id: 'legend-' + i + '-label' }).
       text(line.label).
       css('display', 'inline-block').
       css('padding-left', '5px');
