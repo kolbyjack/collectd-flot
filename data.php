@@ -30,10 +30,10 @@ function parse_args($query_args)
     $args['host'] = abspath($query_args['host']);
 
     if (isset($query_args['chart'])) {
-        $split = split('/', abspath($query_args['chart']));
+        $split = explode('/', abspath($query_args['chart']));
 
-        $plugin_parts = split('-', $split[0], 2);
-        $type_parts = split('-', $split[1], 2);
+        $plugin_parts = explode('-', $split[0], 2);
+        $type_parts = explode('-', $split[1], 2);
 
         $args['plugin'] = $plugin_parts[0];
         $args['plugin_instance'] = $plugin_parts[1];
@@ -177,6 +177,29 @@ function xport($args)
             "XPORT:value:requests");
         break;
 
+    case 'nut':
+        $components = array(
+            array('type' => 'percent', 'type_instance' => 'charge', 'ds' => 'percent', 'label' => 'charge (%)'),
+            array('type' => 'percent', 'type_instance' => 'load', 'ds' => 'percent', 'label' => 'load (%)'),
+            array('type' => 'timeleft', 'type_instance' => 'battery', 'ds' => 'timeleft', 'label' => 'time (min)'),
+            array('type' => 'voltage', 'type_instance' => 'battery', 'ds' => 'value', 'label' => 'batt (V)'),
+            array('type' => 'voltage', 'type_instance' => 'input', 'ds' => 'value', 'label' => 'input (V)')
+        );
+
+        foreach ($components as &$component) {
+            $args['type'] = $component['type'];
+            $args['type_instance'] = $component['type_instance'];
+            $instance = $component['type'].'_'.$component['type_instance'];
+            $ds = $component['ds'];
+            $label = $component['label'];
+
+            $rrd_path = get_rrd_path($args);
+            array_push($options,
+                "DEF:$instance=$rrd_path:$ds:AVERAGE",
+                "XPORT:$instance:$label");
+        }
+        break;
+
     case 'processes':
         $components = array('blocked', 'paging', 'running', 'sleeping', 'stopped', 'zombies');
         add_split_rrd($options, $components, $args, null, 'ps_state');
@@ -268,8 +291,10 @@ function get_params($args)
                 continue;
             }
 
-            $custom_charts = array('load', 'memory', 'swap', 'nginx', 'processes');
-            if (0 === strncmp($entry, 'cpu-', 4) || in_array($entry, $custom_charts)) {
+            $plugin_name = explode('-', $entry);
+            $plugin_name = $plugin_name[0];
+            $custom_charts = array('load', 'memory', 'swap', 'nginx', 'processes', 'nut', 'cpu');
+            if (in_array($plugin_name, $custom_charts)) {
                 $plugins[] = $entry;
             } elseif (($rrd_files = read_rrdfiles("$dirname/$entry"))) {
                 $host = basename($dirname);
